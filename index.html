@@ -63,7 +63,7 @@
 
     <!-- Using esm.sh as the CDN for our dependencies -->
     <script type="module">
-      // Import necessary functions and classes from the Solana libraries
+      // Import necessary functions and classes from Solana libraries.
       import {
         Connection,
         clusterApiUrl,
@@ -79,11 +79,13 @@
         createInitializeMintInstruction
       } from "https://esm.sh/@solana/spl-token@0.3.5";
       
-      // Import the Token Metadata program instructions from Metaplex without a version specifier.
-      import {
-        createCreateMetadataAccountV2Instruction,
-        PROGRAM_ID as TOKEN_METADATA_PROGRAM_ID
-      } from "https://esm.sh/@metaplex-foundation/mpl-token-metadata";
+      // Import the metadata creation instruction from the Metaplex Token Metadata package.
+      import { createCreateMetadataAccountV2Instruction } from "https://esm.sh/@metaplex-foundation/mpl-token-metadata";
+      
+      // Manually define the Token Metadata Program ID.
+      // The public key for the Metaplex Token Metadata program is:
+      // "metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s"
+      const TOKEN_METADATA_PROGRAM_ID = new PublicKey("metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s");
       
       // UI Elements
       const connectWalletButton = document.getElementById("connectWalletButton");
@@ -91,16 +93,16 @@
       const tokenForm = document.getElementById("tokenForm");
       const createTokenButton = document.getElementById("createTokenButton");
       const resultDiv = document.getElementById("result");
-
+      
       // Global variable to hold the wallet (Phantom) object
       let wallet = null;
-
-      // Debug function to log messages
+      
+      // Debug logging function
       function debugLog(message) {
         console.log("[DEBUG]", message);
       }
-
-      // Connect to the Phantom wallet with debugging
+      
+      // Connect to Phantom wallet
       async function connectWallet() {
         debugLog("Attempting to connect wallet...");
         if (window.solana && window.solana.isPhantom) {
@@ -123,9 +125,9 @@
           alert("Phantom wallet not found. Please install it from https://phantom.app");
         }
       }
-
+      
       connectWalletButton.addEventListener("click", connectWallet);
-
+      
       // Function to create a new token mint on Devnet with on‑chain metadata
       async function createToken() {
         debugLog("createToken() called");
@@ -134,19 +136,19 @@
           debugLog("Wallet not connected; aborting token creation.");
           return;
         }
-
-        // Retrieve token parameters and trim any extra spaces.
+      
+        // Retrieve and trim token parameters.
         const tokenName = document.getElementById("tokenName").value.trim();
         const tokenSymbol = document.getElementById("tokenSymbol").value.trim();
         const tokenImage = document.getElementById("tokenImage").value.trim();
         const decimals = parseInt(document.getElementById("decimals").value);
-
+      
         debugLog("Token Name: " + tokenName);
         debugLog("Token Symbol: " + tokenSymbol);
         debugLog("Token Image URL: " + tokenImage);
         debugLog("Token Decimals: " + decimals);
-
-        // Enforce maximum allowed lengths per the Token Metadata standard.
+      
+        // Enforce maximum allowed lengths.
         if (tokenName.length > 32) {
           alert("Token name is too long. Maximum length is 32 characters.");
           return;
@@ -155,10 +157,10 @@
           alert("Token symbol is too long. Maximum length is 10 characters.");
           return;
         }
-
-        // For demonstration we construct a data URI.
-        // NOTE: In production, host your metadata JSON externally (e.g., on Arweave or IPFS)
-        // and provide its URL (which must be ≤200 characters).
+      
+        // Construct metadata JSON and encode as a data URI.
+        // NOTE: In production, you should host your metadata JSON externally (e.g., on Arweave or IPFS)
+        // and supply its URL (which must be ≤200 characters).
         const metadataJSON = {
           name: tokenName,
           symbol: tokenSymbol,
@@ -166,28 +168,27 @@
         };
         const metadataUriCandidate = "data:application/json;base64," + btoa(JSON.stringify(metadataJSON));
         debugLog("Constructed Metadata URI: " + metadataUriCandidate);
-
+      
         // Check if the metadata URI is within the 200-character limit.
         if (metadataUriCandidate.length > 200) {
           alert("The generated metadata URI is too long (" + metadataUriCandidate.length + " characters). " +
                 "Please use shorter values or host your metadata externally.");
           return;
         }
-        // If all is well, use the candidate URI.
         const metadataUri = metadataUriCandidate;
-
-        // Establish a connection to the Devnet
+      
+        // Establish a connection to the Devnet.
         const connection = new Connection(clusterApiUrl("devnet"), "confirmed");
         debugLog("Connected to Solana Devnet.");
-
-        // Generate a new keypair for the token mint
+      
+        // Generate a new keypair for the token mint.
         const mintKeypair = Keypair.generate();
         debugLog("Generated new mint keypair: " + mintKeypair.publicKey.toString());
-
-        // Determine the minimum balance for rent exemption for the mint account
+      
+        // Determine the minimum balance for rent exemption for the mint account.
         const lamports = await connection.getMinimumBalanceForRentExemption(MintLayout.span);
         debugLog("Minimum balance for rent exemption: " + lamports + " lamports");
-
+      
         // Create a transaction with instructions:
         // 1. Create the mint account.
         // 2. Initialize the mint.
@@ -209,7 +210,7 @@
             wallet.publicKey
           )
         );
-
+      
         // Derive the metadata account PDA (Program Derived Address) for the new mint.
         const [metadataPDA] = await PublicKey.findProgramAddress(
           [
@@ -220,7 +221,7 @@
           TOKEN_METADATA_PROGRAM_ID
         );
         debugLog("Derived metadata PDA: " + metadataPDA.toString());
-
+      
         // Prepare the metadata data structure.
         // NOTE: The Token Metadata program limits the lengths:
         //   name: 32 bytes, symbol: 10 bytes, uri: 200 bytes.
@@ -229,9 +230,9 @@
           symbol: tokenSymbol,
           uri: metadataUri,
           sellerFeeBasisPoints: 0, // Set to 0 if you don't plan to collect royalties.
-          creators: null          // You can define creators here if desired.
+          creators: null          // Optionally, define creators here.
         };
-
+      
         // Build the instruction to create the metadata account.
         const metadataInstruction = createCreateMetadataAccountV2Instruction(
           {
@@ -249,20 +250,20 @@
           }
         );
         debugLog("Metadata instruction prepared.");
-
+      
         // Add the metadata instruction to the transaction.
         transaction.add(metadataInstruction);
-
-        // Set transaction parameters
+      
+        // Set transaction parameters.
         transaction.feePayer = wallet.publicKey;
         const { blockhash } = await connection.getRecentBlockhash();
         transaction.recentBlockhash = blockhash;
         debugLog("Transaction prepared with blockhash: " + blockhash);
-
+      
         // Partially sign the transaction with the mint keypair.
         transaction.partialSign(mintKeypair);
         debugLog("Transaction partially signed with mint keypair.");
-
+      
         try {
           debugLog("Requesting wallet to sign the transaction...");
           const signedTransaction = await wallet.signTransaction(transaction);
@@ -271,8 +272,8 @@
           debugLog("Transaction sent, txid: " + txid);
           await connection.confirmTransaction(txid, "confirmed");
           debugLog("Transaction confirmed.");
-
-          // Display the results, including the token metadata
+      
+          // Display the results, including the token metadata.
           resultDiv.innerHTML = `
             <p><strong>Token created successfully!</strong></p>
             <p>Mint Address: <code>${mintKeypair.publicKey.toString()}</code></p>
@@ -286,7 +287,7 @@
           resultDiv.textContent = "Error creating token: " + err.message;
         }
       }
-
+      
       createTokenButton.addEventListener("click", createToken);
     </script>
   </body>
