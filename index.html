@@ -2,7 +2,7 @@
 <html>
   <head>
     <meta charset="UTF-8" />
-    <title>Create a Solana Token with Debug Logging</title>
+    <title>Create a Solana Token with Debug Logging (Using esm.sh)</title>
     <style>
       body {
         font-family: Arial, sans-serif;
@@ -46,22 +46,23 @@
 
     <div id="result"></div>
 
-    <!-- Using JavaScript modules from a CDN -->
+    <!-- Using esm.sh as the CDN for our dependencies -->
     <script type="module">
-      // Import necessary functions from the Solana libraries
+      // Import necessary functions from the Solana libraries using esm.sh
       import {
         Connection,
         clusterApiUrl,
         Keypair,
         SystemProgram,
         Transaction
-      } from "https://cdn.jsdelivr.net/npm/@solana/web3.js@1.73.2/+esm";
+      } from "https://esm.sh/@solana/web3.js@1.73.2";
+      
       import {
         TOKEN_PROGRAM_ID,
         MintLayout,
         createInitializeMintInstruction
-      } from "https://cdn.jsdelivr.net/npm/@solana/spl-token@0.3.5/+esm";
-
+      } from "https://esm.sh/@solana/spl-token@0.3.5";
+      
       // UI Elements
       const connectWalletButton = document.getElementById("connectWalletButton");
       const walletAddressDisplay = document.getElementById("walletAddress");
