@@ -135,7 +135,7 @@
           return;
         }
 
-        // Retrieve token parameters
+        // Retrieve token parameters and trim any extra spaces.
         const tokenName = document.getElementById("tokenName").value.trim();
         const tokenSymbol = document.getElementById("tokenSymbol").value.trim();
         const tokenImage = document.getElementById("tokenImage").value.trim();
@@ -146,19 +146,35 @@
         debugLog("Token Image URL: " + tokenImage);
         debugLog("Token Decimals: " + decimals);
 
-        // Construct metadata JSON from the provided values.
-        // This JSON should follow the metadata standard.
+        // Enforce maximum allowed lengths
+        if (tokenName.length > 32) {
+          alert("Token name is too long. Maximum length is 32 characters.");
+          return;
+        }
+        if (tokenSymbol.length > 10) {
+          alert("Token symbol is too long. Maximum length is 10 characters.");
+          return;
+        }
+
+        // For demonstration we construct a data URI.
+        // NOTE: In production, host your metadata JSON externally (e.g., on Arweave or IPFS)
+        // and provide its URL (which must be ≤200 characters).
         const metadataJSON = {
           name: tokenName,
           symbol: tokenSymbol,
           image: tokenImage
-          // You can add additional fields like "description", "attributes", etc.
         };
+        const metadataUriCandidate = "data:application/json;base64," + btoa(JSON.stringify(metadataJSON));
+        debugLog("Constructed Metadata URI: " + metadataUriCandidate);
 
-        // Encode the JSON as a base64 data URI.
-        // (In production, you’d normally upload this JSON to a storage solution and use its URL.)
-        const metadataUri = "data:application/json;base64," + btoa(JSON.stringify(metadataJSON));
-        debugLog("Metadata URI: " + metadataUri);
+        // Check if the metadata URI is within the 200-character limit.
+        if (metadataUriCandidate.length > 200) {
+          alert("The generated metadata URI is too long (" + metadataUriCandidate.length + " characters). " +
+                "Please use shorter values or host your metadata externally.");
+          return;
+        }
+        // If all is well, use the candidate URI.
+        const metadataUri = metadataUriCandidate;
 
         // Establish a connection to the Devnet
         const connection = new Connection(clusterApiUrl("devnet"), "confirmed");
@@ -206,8 +222,8 @@
         debugLog("Derived metadata PDA: " + metadataPDA.toString());
 
         // Prepare the metadata data structure.
-        // Note: The Token Metadata program limits the length of the strings:
-        // name (32 bytes max), symbol (10 bytes max), uri (200 bytes max).
+        // NOTE: The Token Metadata program limits the lengths:
+        //   name: 32 bytes, symbol: 10 bytes, uri: 200 bytes.
         const metadataData = {
           name: tokenName,
           symbol: tokenSymbol,
