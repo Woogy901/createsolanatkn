@@ -79,7 +79,7 @@
         createInitializeMintInstruction
       } from "https://esm.sh/@solana/spl-token@0.3.5";
       
-      // Import the metadata creation instruction from the Metaplex Token Metadata package.
+      // Import only the metadata creation instruction from the Metaplex package.
       import { createCreateMetadataAccountV2Instruction } from "https://esm.sh/@metaplex-foundation/mpl-token-metadata";
       
       // Manually define the Token Metadata Program ID.
@@ -159,7 +159,7 @@
         }
       
         // Construct metadata JSON and encode as a data URI.
-        // NOTE: In production, you should host your metadata JSON externally (e.g., on Arweave or IPFS)
+        // NOTE: In production, host your metadata JSON externally (e.g., on Arweave or IPFS)
         // and supply its URL (which must be ≤200 characters).
         const metadataJSON = {
           name: tokenName,
