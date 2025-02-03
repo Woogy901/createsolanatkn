@@ -2,7 +2,7 @@
 <html>
   <head>
     <meta charset="UTF-8" />
-    <title>Create a Solana Token with Metadata Inputs</title>
+    <title>Create a Solana Token with On‑Chain Metadata</title>
     <style>
       body {
         font-family: Arial, sans-serif;
@@ -36,7 +36,7 @@
     </style>
   </head>
   <body>
-    <h1>Create a Solana Token</h1>
+    <h1>Create a Solana Token with Metadata</h1>
     <div id="wallet-connection">
       <button id="connectWalletButton">Connect Wallet (Phantom)</button>
       <p id="walletAddress"></p>
@@ -63,13 +63,14 @@
 
     <!-- Using esm.sh as the CDN for our dependencies -->
     <script type="module">
-      // Import necessary functions from the Solana libraries using esm.sh
+      // Import necessary functions and classes from the Solana libraries using esm.sh
       import {
         Connection,
         clusterApiUrl,
         Keypair,
         SystemProgram,
-        Transaction
+        Transaction,
+        PublicKey
       } from "https://esm.sh/@solana/web3.js@1.73.2";
       
       import {
@@ -77,6 +78,12 @@
         MintLayout,
         createInitializeMintInstruction
       } from "https://esm.sh/@solana/spl-token@0.3.5";
+      
+      // Import the Token Metadata program instructions from Metaplex
+      import {
+        createCreateMetadataAccountV2Instruction,
+        PROGRAM_ID as TOKEN_METADATA_PROGRAM_ID
+      } from "https://esm.sh/@metaplex-foundation/mpl-token-metadata@0.12.0";
       
       // UI Elements
       const connectWalletButton = document.getElementById("connectWalletButton");
@@ -93,7 +100,7 @@
         console.log("[DEBUG]", message);
       }
 
-      // Connect to the Phantom wallet with debug logging
+      // Connect to the Phantom wallet with debugging
       async function connectWallet() {
         debugLog("Attempting to connect wallet...");
         if (window.solana && window.solana.isPhantom) {
@@ -119,7 +126,7 @@
 
       connectWalletButton.addEventListener("click", connectWallet);
 
-      // Create a new token mint on the Solana Devnet and display the metadata
+      // Function to create a new token mint on Devnet with on‑chain metadata
       async function createToken() {
         debugLog("createToken() called");
         if (!wallet) {
@@ -129,15 +136,29 @@
         }
 
         // Retrieve token parameters
-        const tokenName = document.getElementById("tokenName").value;
-        const tokenSymbol = document.getElementById("tokenSymbol").value;
-        const tokenImage = document.getElementById("tokenImage").value;
+        const tokenName = document.getElementById("tokenName").value.trim();
+        const tokenSymbol = document.getElementById("tokenSymbol").value.trim();
+        const tokenImage = document.getElementById("tokenImage").value.trim();
         const decimals = parseInt(document.getElementById("decimals").value);
 
         debugLog("Token Name: " + tokenName);
         debugLog("Token Symbol: " + tokenSymbol);
         debugLog("Token Image URL: " + tokenImage);
         debugLog("Token Decimals: " + decimals);
+
+        // Construct metadata JSON from the provided values.
+        // This JSON should follow the metadata standard.
+        const metadataJSON = {
+          name: tokenName,
+          symbol: tokenSymbol,
+          image: tokenImage
+          // You can add additional fields like "description", "attributes", etc.
+        };
+
+        // Encode the JSON as a base64 data URI.
+        // (In production, you’d normally upload this JSON to a storage solution and use its URL.)
+        const metadataUri = "data:application/json;base64," + btoa(JSON.stringify(metadataJSON));
+        debugLog("Metadata URI: " + metadataUri);
 
         // Establish a connection to the Devnet
         const connection = new Connection(clusterApiUrl("devnet"), "confirmed");
@@ -173,12 +194,56 @@
           )
         );
 
+        // Derive the metadata account PDA (Program Derived Address) for the new mint.
+        const [metadataPDA] = await PublicKey.findProgramAddress(
+          [
+            Buffer.from("metadata"),
+            TOKEN_METADATA_PROGRAM_ID.toBuffer(),
+            mintKeypair.publicKey.toBuffer(),
+          ],
+          TOKEN_METADATA_PROGRAM_ID
+        );
+        debugLog("Derived metadata PDA: " + metadataPDA.toString());
+
+        // Prepare the metadata data structure.
+        // Note: The Token Metadata program limits the length of the strings:
+        // name (32 bytes max), symbol (10 bytes max), uri (200 bytes max).
+        const metadataData = {
+          name: tokenName,
+          symbol: tokenSymbol,
+          uri: metadataUri,
+          sellerFeeBasisPoints: 0, // Set to 0 if you don't plan to collect royalties.
+          creators: null          // You can define creators here if desired.
+        };
+
+        // Build the instruction to create the metadata account.
+        const metadataInstruction = createCreateMetadataAccountV2Instruction(
+          {
+            metadata: metadataPDA,
+            mint: mintKeypair.publicKey,
+            mintAuthority: wallet.publicKey,
+            payer: wallet.publicKey,
+            updateAuthority: wallet.publicKey,
+          },
+          {
+            createMetadataAccountArgsV2: {
+              data: metadataData,
+              isMutable: true,
+            },
+          }
+        );
+        debugLog("Metadata instruction prepared.");
+
+        // Add the metadata instruction to the transaction.
+        transaction.add(metadataInstruction);
+
+        // Set transaction parameters
         transaction.feePayer = wallet.publicKey;
         const { blockhash } = await connection.getRecentBlockhash();
         transaction.recentBlockhash = blockhash;
         debugLog("Transaction prepared with blockhash: " + blockhash);
 
-        // Partially sign the transaction with the mint keypair
+        // Partially sign the transaction with the mint keypair.
         transaction.partialSign(mintKeypair);
         debugLog("Transaction partially signed with mint keypair.");
 
@@ -191,7 +256,7 @@
           await connection.confirmTransaction(txid, "confirmed");
           debugLog("Transaction confirmed.");
 
-          // Display the results, including token metadata inputs
+          // Display the results, including the token metadata
           resultDiv.innerHTML = `
             <p><strong>Token created successfully!</strong></p>
             <p>Mint Address: <code>${mintKeypair.publicKey.toString()}</code></p>
