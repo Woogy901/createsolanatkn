@@ -2,7 +2,7 @@
 <html>
   <head>
     <meta charset="UTF-8" />
-    <title>Create a Solana Token</title>
+    <title>Create a Solana Token with Debug Logging</title>
     <style>
       body {
         font-family: Arial, sans-serif;
@@ -39,8 +39,6 @@
 
     <div id="tokenForm" style="display: none;">
       <h2>Token Parameters</h2>
-      <!-- Note: SPL tokens require only a "decimals" parameter at initialization.
-           More complex setups (like metadata) require additional steps. -->
       <label for="decimals">Decimals:</label>
       <input type="number" id="decimals" value="0" min="0" max="9" />
       <button id="createTokenButton">Create Token on Devnet</button>
@@ -48,10 +46,7 @@
 
     <div id="result"></div>
 
-    <!--
-      We use JavaScript modules imported from a CDN.
-      The versions used below are examples; you can adjust versions as needed.
-    -->
+    <!-- Using JavaScript modules from a CDN -->
     <script type="module">
       // Import necessary functions from the Solana libraries
       import {
@@ -77,54 +72,66 @@
       // Global variable to hold the wallet (Phantom) object
       let wallet = null;
 
-      // Connect to Phantom Wallet
+      // Debug function to log messages
+      function debugLog(message) {
+        console.log("[DEBUG]", message);
+      }
+
+      // Function to connect to the Phantom Wallet with debugging
       async function connectWallet() {
+        debugLog("Attempting to connect wallet...");
         if (window.solana && window.solana.isPhantom) {
           try {
-            // Request connection to the wallet
+            debugLog("Phantom wallet detected.");
             const response = await window.solana.connect();
+            debugLog("Wallet connection response: " + JSON.stringify(response));
             wallet = window.solana;
             walletAddressDisplay.textContent =
               "Connected: " + response.publicKey.toString();
             tokenForm.style.display = "block";
+            debugLog("Wallet connected and token form displayed.");
           } catch (err) {
-            console.error("Wallet connection error: ", err);
-            walletAddressDisplay.textContent = "Wallet connection failed";
+            console.error("Wallet connection error:", err);
+            walletAddressDisplay.textContent = "Wallet connection failed: " + err.message;
           }
         } else {
+          console.warn("Phantom wallet not found.");
           alert("Phantom wallet not found. Please install it from https://phantom.app");
         }
       }
 
       connectWalletButton.addEventListener("click", connectWallet);
 
-      // Function to create a new token mint on the Solana Devnet
+      // Function to create a new token mint on the Solana Devnet with debugging
       async function createToken() {
+        debugLog("createToken() called");
         if (!wallet) {
           alert("Please connect your wallet first.");
+          debugLog("Wallet not connected; aborting token creation.");
           return;
         }
 
-        // Retrieve the decimals value from the form
         const decimals = parseInt(document.getElementById("decimals").value);
+        debugLog("Token decimals: " + decimals);
 
         // Establish a connection to the Devnet
         const connection = new Connection(clusterApiUrl("devnet"), "confirmed");
+        debugLog("Connected to Solana Devnet.");
 
-        // Generate a new keypair that will be used for the token mint account
+        // Generate a new keypair for the token mint
         const mintKeypair = Keypair.generate();
+        debugLog("Generated new mint keypair: " + mintKeypair.publicKey.toString());
 
-        // Determine the rent-exempt minimum balance for a mint account
+        // Determine the minimum balance for rent exemption
         const lamports = await connection.getMinimumBalanceForRentExemption(MintLayout.span);
+        debugLog("Minimum balance for rent exemption: " + lamports + " lamports");
 
-        // Create a transaction with two instructions:
-        // 1. Create the new mint account.
-        // 2. Initialize the mint (set decimals, mint authority, and freeze authority).
+        // Create a transaction with instructions
         let transaction = new Transaction();
         transaction.add(
           SystemProgram.createAccount({
-            fromPubkey: wallet.publicKey,         // funded by the connected wallet
-            newAccountPubkey: mintKeypair.publicKey, // new mint account
+            fromPubkey: wallet.publicKey,
+            newAccountPubkey: mintKeypair.publicKey,
             space: MintLayout.span,
             lamports,
             programId: TOKEN_PROGRAM_ID,
@@ -132,38 +139,38 @@
         );
         transaction.add(
           createInitializeMintInstruction(
-            mintKeypair.publicKey, // mint account
-            decimals,              // number of decimals
-            wallet.publicKey,      // mint authority (set to the connected wallet)
-            wallet.publicKey       // freeze authority (can be set to null if you don’t need freezing)
+            mintKeypair.publicKey,
+            decimals,
+            wallet.publicKey,
+            wallet.publicKey
           )
         );
 
-        // Set transaction parameters
         transaction.feePayer = wallet.publicKey;
         const { blockhash } = await connection.getRecentBlockhash();
         transaction.recentBlockhash = blockhash;
+        debugLog("Transaction prepared with blockhash: " + blockhash);
 
-        // Partially sign the transaction with the mint account keypair.
-        // (The wallet will sign the rest.)
+        // Partially sign the transaction with the mint keypair
         transaction.partialSign(mintKeypair);
+        debugLog("Transaction partially signed with mint keypair.");
 
         try {
-          // Request the wallet (Phantom) to sign the transaction.
+          debugLog("Requesting wallet to sign the transaction...");
           const signedTransaction = await wallet.signTransaction(transaction);
-          // Send the transaction to the network.
+          debugLog("Transaction signed by wallet.");
           const txid = await connection.sendRawTransaction(signedTransaction.serialize());
-          // Confirm the transaction.
+          debugLog("Transaction sent, txid: " + txid);
           await connection.confirmTransaction(txid, "confirmed");
+          debugLog("Transaction confirmed.");
 
-          // Display the result
           resultDiv.innerHTML = `
             <p><strong>Token created successfully!</strong></p>
             <p>Mint Address: <code>${mintKeypair.publicKey.toString()}</code></p>
             <p>Transaction ID: <a href="https://explorer.solana.com/tx/${txid}?cluster=devnet" target="_blank">${txid}</a></p>
           `;
         } catch (err) {
-          console.error("Error creating token: ", err);
+          console.error("Error creating token:", err);
           resultDiv.textContent = "Error creating token: " + err.message;
         }
       }
