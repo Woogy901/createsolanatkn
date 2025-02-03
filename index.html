@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <title>Create a Solana Token</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        max-width: 800px;
+        margin: 2rem auto;
+        padding: 0 1rem;
+      }
+      label, input, button {
+        display: block;
+        margin: 0.5rem 0;
+      }
+      input {
+        padding: 0.5rem;
+        width: 100%;
+        max-width: 300px;
+      }
+      button {
+        padding: 0.5rem 1rem;
+        cursor: pointer;
+      }
+      #result p {
+        background: #eef;
+        padding: 0.5rem;
+        border: 1px solid #ccd;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Create a Solana Token</h1>
+    <div id="wallet-connection">
+      <button id="connectWalletButton">Connect Wallet (Phantom)</button>
+      <p id="walletAddress"></p>
+    </div>
+
+    <div id="tokenForm" style="display: none;">
+      <h2>Token Parameters</h2>
+      <!-- Note: SPL tokens require only a "decimals" parameter at initialization.
+           More complex setups (like metadata) require additional steps. -->
+      <label for="decimals">Decimals:</label>
+      <input type="number" id="decimals" value="0" min="0" max="9" />
+      <button id="createTokenButton">Create Token on Devnet</button>
+    </div>
+
+    <div id="result"></div>
+
+    <!--
+      We use JavaScript modules imported from a CDN.
+      The versions used below are examples; you can adjust versions as needed.
+    -->
+    <script type="module">
+      // Import necessary functions from the Solana libraries
+      import {
+        Connection,
+        clusterApiUrl,
+        Keypair,
+        SystemProgram,
+        Transaction
+      } from "https://cdn.jsdelivr.net/npm/@solana/web3.js@1.73.2/+esm";
+      import {
+        TOKEN_PROGRAM_ID,
+        MintLayout,
+        createInitializeMintInstruction
+      } from "https://cdn.jsdelivr.net/npm/@solana/spl-token@0.3.5/+esm";
+
+      // UI Elements
+      const connectWalletButton = document.getElementById("connectWalletButton");
+      const walletAddressDisplay = document.getElementById("walletAddress");
+      const tokenForm = document.getElementById("tokenForm");
+      const createTokenButton = document.getElementById("createTokenButton");
+      const resultDiv = document.getElementById("result");
+
+      // Global variable to hold the wallet (Phantom) object
+      let wallet = null;
+
+      // Connect to Phantom Wallet
+      async function connectWallet() {
+        if (window.solana && window.solana.isPhantom) {
+          try {
+            // Request connection to the wallet
+            const response = await window.solana.connect();
+            wallet = window.solana;
+            walletAddressDisplay.textContent =
+              "Connected: " + response.publicKey.toString();
+            tokenForm.style.display = "block";
+          } catch (err) {
+            console.error("Wallet connection error: ", err);
+            walletAddressDisplay.textContent = "Wallet connection failed";
+          }
+        } else {
+          alert("Phantom wallet not found. Please install it from https://phantom.app");
+        }
+      }
+
+      connectWalletButton.addEventListener("click", connectWallet);
+
+      // Function to create a new token mint on the Solana Devnet
+      async function createToken() {
+        if (!wallet) {
+          alert("Please connect your wallet first.");
+          return;
+        }
+
+        // Retrieve the decimals value from the form
+        const decimals = parseInt(document.getElementById("decimals").value);
+
+        // Establish a connection to the Devnet
+        const connection = new Connection(clusterApiUrl("devnet"), "confirmed");
+
+        // Generate a new keypair that will be used for the token mint account
+        const mintKeypair = Keypair.generate();
+
+        // Determine the rent-exempt minimum balance for a mint account
+        const lamports = await connection.getMinimumBalanceForRentExemption(MintLayout.span);
+
+        // Create a transaction with two instructions:
+        // 1. Create the new mint account.
+        // 2. Initialize the mint (set decimals, mint authority, and freeze authority).
+        let transaction = new Transaction();
+        transaction.add(
+          SystemProgram.createAccount({
+            fromPubkey: wallet.publicKey,         // funded by the connected wallet
+            newAccountPubkey: mintKeypair.publicKey, // new mint account
+            space: MintLayout.span,
+            lamports,
+            programId: TOKEN_PROGRAM_ID,
+          })
+        );
+        transaction.add(
+          createInitializeMintInstruction(
+            mintKeypair.publicKey, // mint account
+            decimals,              // number of decimals
+            wallet.publicKey,      // mint authority (set to the connected wallet)
+            wallet.publicKey       // freeze authority (can be set to null if you don’t need freezing)
+          )
+        );
+
+        // Set transaction parameters
+        transaction.feePayer = wallet.publicKey;
+        const { blockhash } = await connection.getRecentBlockhash();
+        transaction.recentBlockhash = blockhash;
+
+        // Partially sign the transaction with the mint account keypair.
+        // (The wallet will sign the rest.)
+        transaction.partialSign(mintKeypair);
+
+        try {
+          // Request the wallet (Phantom) to sign the transaction.
+          const signedTransaction = await wallet.signTransaction(transaction);
+          // Send the transaction to the network.
+          const txid = await connection.sendRawTransaction(signedTransaction.serialize());
+          // Confirm the transaction.
+          await connection.confirmTransaction(txid, "confirmed");
+
+          // Display the result
+          resultDiv.innerHTML = `
+            <p><strong>Token created successfully!</strong></p>
+            <p>Mint Address: <code>${mintKeypair.publicKey.toString()}</code></p>
+            <p>Transaction ID: <a href="https://explorer.solana.com/tx/${txid}?cluster=devnet" target="_blank">${txid}</a></p>
+          `;
+        } catch (err) {
+          console.error("Error creating token: ", err);
+          resultDiv.textContent = "Error creating token: " + err.message;
+        }
+      }
+
+      createTokenButton.addEventListener("click", createToken);
+    </script>
+  </body>
+</html>
