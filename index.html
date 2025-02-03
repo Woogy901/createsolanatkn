@@ -61,9 +61,9 @@
 
     <div id="result"></div>
 
-    <!-- Using esm.sh as the CDN for our dependencies -->
+    <!-- Load dependencies using esm.sh -->
     <script type="module">
-      // Import necessary functions and classes from Solana libraries.
+      // Import from Solana web3.js and SPL Token.
       import {
         Connection,
         clusterApiUrl,
@@ -79,13 +79,17 @@
         createInitializeMintInstruction
       } from "https://esm.sh/@solana/spl-token@0.3.5";
       
-      // Import only the metadata creation instruction from the Metaplex package.
-      import { createCreateMetadataAccountV2Instruction } from "https://esm.sh/@metaplex-foundation/mpl-token-metadata";
+      // Import all exports from the Metaplex Token Metadata package (version 0.14.1)
+      // and then destructure the instruction function.
+      import * as mplTokenMetadata from "https://esm.sh/@metaplex-foundation/mpl-token-metadata@0.14.1";
+      const { createCreateMetadataAccountV2Instruction } = mplTokenMetadata;
       
       // Manually define the Token Metadata Program ID.
-      // The public key for the Metaplex Token Metadata program is:
+      // The Metaplex Token Metadata program ID is:
       // "metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s"
-      const TOKEN_METADATA_PROGRAM_ID = new PublicKey("metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s");
+      const TOKEN_METADATA_PROGRAM_ID = new PublicKey(
+        "metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s"
+      );
       
       // UI Elements
       const connectWalletButton = document.getElementById("connectWalletButton");
@@ -94,15 +98,15 @@
       const createTokenButton = document.getElementById("createTokenButton");
       const resultDiv = document.getElementById("result");
       
-      // Global variable to hold the wallet (Phantom) object
+      // Global variable to hold the wallet (Phantom) object.
       let wallet = null;
       
-      // Debug logging function
+      // Debug logging function.
       function debugLog(message) {
         console.log("[DEBUG]", message);
       }
       
-      // Connect to Phantom wallet
+      // Connect to Phantom wallet.
       async function connectWallet() {
         debugLog("Attempting to connect wallet...");
         if (window.solana && window.solana.isPhantom) {
@@ -128,7 +132,7 @@
       
       connectWalletButton.addEventListener("click", connectWallet);
       
-      // Function to create a new token mint on Devnet with on‑chain metadata
+      // Function to create a new token mint on Devnet with on‑chain metadata.
       async function createToken() {
         debugLog("createToken() called");
         if (!wallet) {
@@ -166,13 +170,17 @@
           symbol: tokenSymbol,
           image: tokenImage
         };
-        const metadataUriCandidate = "data:application/json;base64," + btoa(JSON.stringify(metadataJSON));
+        const metadataUriCandidate =
+          "data:application/json;base64," + btoa(JSON.stringify(metadataJSON));
         debugLog("Constructed Metadata URI: " + metadataUriCandidate);
       
         // Check if the metadata URI is within the 200-character limit.
         if (metadataUriCandidate.length > 200) {
-          alert("The generated metadata URI is too long (" + metadataUriCandidate.length + " characters). " +
-                "Please use shorter values or host your metadata externally.");
+          alert(
+            "The generated metadata URI is too long (" +
+              metadataUriCandidate.length +
+              " characters). Please use shorter values or host your metadata externally."
+          );
           return;
         }
         const metadataUri = metadataUriCandidate;
@@ -230,7 +238,7 @@
           symbol: tokenSymbol,
           uri: metadataUri,
           sellerFeeBasisPoints: 0, // Set to 0 if you don't plan to collect royalties.
-          creators: null          // Optionally, define creators here.
+          creators: null           // Optionally, define creators here.
         };
       
         // Build the instruction to create the metadata account.
@@ -280,7 +288,7 @@
             <p>Transaction ID: <a href="https://explorer.solana.com/tx/${txid}?cluster=devnet" target="_blank">${txid}</a></p>
             <p>Token Name: <strong>${tokenName}</strong></p>
             <p>Token Symbol: <strong>${tokenSymbol}</strong></p>
-            <p>Token Image: <img class="token-image" src="${tokenImage}" alt="${tokenName}" /></p>
+            <p>Token Image: <img class="token-image" src="${tokenImage}" alt="${tokenName}"></p>
           `;
         } catch (err) {
           console.error("Error creating token:", err);
