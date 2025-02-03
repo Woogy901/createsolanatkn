@@ -2,7 +2,7 @@
 <html>
   <head>
     <meta charset="UTF-8" />
-    <title>Create a Solana Token with Debug Logging (Using esm.sh)</title>
+    <title>Create a Solana Token with Metadata Inputs</title>
     <style>
       body {
         font-family: Arial, sans-serif;
@@ -28,6 +28,11 @@
         padding: 0.5rem;
         border: 1px solid #ccd;
       }
+      img.token-image {
+        display: block;
+        margin-top: 0.5rem;
+        max-width: 150px;
+      }
     </style>
   </head>
   <body>
@@ -39,8 +44,18 @@
 
     <div id="tokenForm" style="display: none;">
       <h2>Token Parameters</h2>
+      <label for="tokenName">Token Name:</label>
+      <input type="text" id="tokenName" placeholder="Enter token name" />
+
+      <label for="tokenSymbol">Token Symbol:</label>
+      <input type="text" id="tokenSymbol" placeholder="Enter token symbol" />
+
+      <label for="tokenImage">Token Image URL:</label>
+      <input type="url" id="tokenImage" placeholder="Enter token image URL" />
+
       <label for="decimals">Decimals:</label>
       <input type="number" id="decimals" value="0" min="0" max="9" />
+
       <button id="createTokenButton">Create Token on Devnet</button>
     </div>
 
@@ -78,7 +93,7 @@
         console.log("[DEBUG]", message);
       }
 
-      // Function to connect to the Phantom Wallet with debugging
+      // Connect to the Phantom wallet with debug logging
       async function connectWallet() {
         debugLog("Attempting to connect wallet...");
         if (window.solana && window.solana.isPhantom) {
@@ -93,7 +108,8 @@
             debugLog("Wallet connected and token form displayed.");
           } catch (err) {
             console.error("Wallet connection error:", err);
-            walletAddressDisplay.textContent = "Wallet connection failed: " + err.message;
+            walletAddressDisplay.textContent =
+              "Wallet connection failed: " + err.message;
           }
         } else {
           console.warn("Phantom wallet not found.");
@@ -103,7 +119,7 @@
 
       connectWalletButton.addEventListener("click", connectWallet);
 
-      // Function to create a new token mint on the Solana Devnet with debugging
+      // Create a new token mint on the Solana Devnet and display the metadata
       async function createToken() {
         debugLog("createToken() called");
         if (!wallet) {
@@ -112,8 +128,16 @@
           return;
         }
 
+        // Retrieve token parameters
+        const tokenName = document.getElementById("tokenName").value;
+        const tokenSymbol = document.getElementById("tokenSymbol").value;
+        const tokenImage = document.getElementById("tokenImage").value;
         const decimals = parseInt(document.getElementById("decimals").value);
-        debugLog("Token decimals: " + decimals);
+
+        debugLog("Token Name: " + tokenName);
+        debugLog("Token Symbol: " + tokenSymbol);
+        debugLog("Token Image URL: " + tokenImage);
+        debugLog("Token Decimals: " + decimals);
 
         // Establish a connection to the Devnet
         const connection = new Connection(clusterApiUrl("devnet"), "confirmed");
@@ -123,11 +147,13 @@
         const mintKeypair = Keypair.generate();
         debugLog("Generated new mint keypair: " + mintKeypair.publicKey.toString());
 
-        // Determine the minimum balance for rent exemption
+        // Determine the minimum balance for rent exemption for the mint account
         const lamports = await connection.getMinimumBalanceForRentExemption(MintLayout.span);
         debugLog("Minimum balance for rent exemption: " + lamports + " lamports");
 
-        // Create a transaction with instructions
+        // Create a transaction with instructions:
+        // 1. Create the mint account.
+        // 2. Initialize the mint.
         let transaction = new Transaction();
         transaction.add(
           SystemProgram.createAccount({
@@ -165,10 +191,14 @@
           await connection.confirmTransaction(txid, "confirmed");
           debugLog("Transaction confirmed.");
 
+          // Display the results, including token metadata inputs
           resultDiv.innerHTML = `
             <p><strong>Token created successfully!</strong></p>
             <p>Mint Address: <code>${mintKeypair.publicKey.toString()}</code></p>
             <p>Transaction ID: <a href="https://explorer.solana.com/tx/${txid}?cluster=devnet" target="_blank">${txid}</a></p>
+            <p>Token Name: <strong>${tokenName}</strong></p>
+            <p>Token Symbol: <strong>${tokenSymbol}</strong></p>
+            <p>Token Image: <img class="token-image" src="${tokenImage}" alt="${tokenName}" /></p>
           `;
         } catch (err) {
           console.error("Error creating token:", err);
